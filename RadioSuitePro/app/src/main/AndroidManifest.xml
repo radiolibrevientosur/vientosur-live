@@ -23,6 +23,8 @@
 
     <application
         android:label="RadioSuite Pro"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Theme.RadioSuitePro"
         android:supportsRtl="true"
         android:allowBackup="false">

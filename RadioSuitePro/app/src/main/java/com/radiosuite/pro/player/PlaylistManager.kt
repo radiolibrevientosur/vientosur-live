@@ -1,5 +1,7 @@
 package com.radiosuite.pro.player
 
+import com.radiosuite.pro.model.Track
+
 /**
  * Gestiona la cola de reproducción, los crossfades automáticos entre pistas
  * y la mezcla entre la entrada de micrófono/consola y el reproductor de música.

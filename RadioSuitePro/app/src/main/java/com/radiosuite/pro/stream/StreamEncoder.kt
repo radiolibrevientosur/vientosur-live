@@ -1,5 +1,7 @@
 package com.radiosuite.pro.stream
 
+import androidx.annotation.Keep
+
 /**
  * Codec de emisión soportado por el codificador nativo (C++).
  */
@@ -18,14 +20,22 @@ enum class StreamCodec(val nativeId: Int) {
  * El pipeline DSP alimenta el codificador; los paquetes resultantes se envían
  * a Icecast/Shoutcast mediante [IcecastClient].
  */
-class StreamEncoder(private val engineHandle: Long) {
+class StreamEncoder(
+    private val engineHandle: Long,
+    private val packetCallback: (ByteArray) -> Unit,
+) {
 
     private var started = false
 
     fun start(codec: StreamCodec, sampleRate: Int, channels: Int, bitrate: Int): Boolean {
-        started = nativeStartEncoder(engineHandle, codec.nativeId, sampleRate, channels, bitrate)
+        started = nativeStartEncoder(
+            engineHandle, codec.nativeId, sampleRate, channels, bitrate, this
+        )
         return started
     }
+
+    @Keep
+    fun onNativePacket(packet: ByteArray) = packetCallback(packet)
 
     fun stop() {
         if (started) {
@@ -34,14 +44,19 @@ class StreamEncoder(private val engineHandle: Long) {
         }
     }
 
-    private external companion object {
-        @JvmStatic fun nativeStartEncoder(
-            handle: Long, codec: Int, sampleRate: Int, channels: Int, bitrate: Int
+    companion object {
+        @JvmStatic private external fun nativeStartEncoder(
+            handle: Long,
+            codec: Int,
+            sampleRate: Int,
+            channels: Int,
+            bitrate: Int,
+            callback: StreamEncoder,
         ): Boolean
-        @JvmStatic fun nativeStopEncoder(handle: Long)
-    }
+        @JvmStatic private external fun nativeStopEncoder(handle: Long)
 
-    init {
-        System.loadLibrary("radiosuite-native")
+        init {
+            System.loadLibrary("radiosuite-native")
+        }
     }
 }

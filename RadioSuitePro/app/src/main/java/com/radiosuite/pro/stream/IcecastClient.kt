@@ -4,7 +4,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.BufferedReader
 import java.io.IOException
+import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.Socket
 import java.util.concurrent.TimeUnit
@@ -29,6 +31,8 @@ class IcecastClient(
 ) {
     @Volatile private var connected = false
     @Volatile private var shouldRun = false
+    @Volatile var lastError: String = ""
+        private set
     private var socket: Socket? = null
     private var out: OutputStream? = null
     private val client = OkHttpClient.Builder()
@@ -75,6 +79,7 @@ class IcecastClient(
                 }
             } catch (e: IOException) {
                 connected = false
+                lastError = e.message ?: "No se pudo conectar con Icecast"
                 closeConnection()
             }
             if (shouldRun) {
@@ -86,6 +91,7 @@ class IcecastClient(
 
     private fun connect() {
         val s = Socket(host, port)
+        s.soTimeout = 10_000
         s.tcpNoDelay = true
         s.keepAlive = true
         socket = s
@@ -106,6 +112,12 @@ class IcecastClient(
             write(request.toByteArray())
             flush()
         }
+        val response = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.US_ASCII)).readLine()
+            ?: throw IOException("Icecast cerró la conexión sin responder")
+        val statusCode = response.split(' ').getOrNull(1)?.toIntOrNull()
+        if (statusCode != 200) throw IOException("Icecast respondió: $response")
+        s.soTimeout = 0
+        lastError = ""
         connected = true
     }
 

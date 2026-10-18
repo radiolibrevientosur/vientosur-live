@@ -4,6 +4,7 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <thread>
 #include <vector>
 
 namespace radiosuite::audio {
@@ -51,6 +52,7 @@ private:
     PacketCallback packetCallback_;
     RingBuffer ringL_, ringR_;
     std::vector<uint8_t> packetBuf_;
+    std::thread encodeThread_;
 
     bool initEncoder();
     void destroyEncoder();

@@ -13,6 +13,9 @@ class DspEngine {
 
     private var handle: Long = 0L
     private var released = false
+    @Volatile var isRendering: Boolean = false
+        private set
+    internal val nativeHandle: Long get() = handle
 
     init {
         handle = nativeCreate()
@@ -20,10 +23,16 @@ class DspEngine {
     }
 
     /** Inicia el render Oboe + pipeline. */
-    fun start(): Boolean = nativeStart(handle)
+    fun start(): Boolean {
+        isRendering = nativeStart(handle)
+        return isRendering
+    }
 
     /** Detiene el render y libera el stream Oboe. */
-    fun stop() = nativeStop(handle)
+    fun stop() {
+        isRendering = false
+        nativeStop(handle)
+    }
 
     /** Publica una nueva instantánea de parámetros del pipeline. */
     fun updatePipeline(params: DspParameters) {
@@ -36,6 +45,22 @@ class DspEngine {
             params.outputGainDb,
             params.enabled
         )
+    }
+
+    fun setSourceGain(sourceId: Int, gainDb: Float) {
+        if (handle != 0L) nativeSetSourceGain(handle, sourceId, gainDb.coerceIn(-60f, 6f))
+    }
+
+    fun pushInputSamples(samples: FloatArray, channels: Int = 1, frames: Int = samples.size / channels) {
+        if (samples.isNotEmpty() && handle != 0L) {
+            nativePushInputPcm(handle, samples, channels, frames)
+        }
+    }
+
+    fun pushPlayerSamples(samples: FloatArray, channels: Int, frames: Int = samples.size / channels) {
+        if (samples.isNotEmpty() && handle != 0L) {
+            nativePushPlayerPcm(handle, samples, channels, frames)
+        }
     }
 
     // ---- Métricas para vómetros en tiempo real ----
@@ -56,25 +81,28 @@ class DspEngine {
 
     protected fun finalize() = release()
 
-    // ---- Declaraciones nativas (jni_bridge.cpp) ----
-    private external companion object {
-        @JvmStatic fun nativeCreate(): Long
-        @JvmStatic fun nativeDestroy(handle: Long)
-        @JvmStatic fun nativeStart(handle: Long): Boolean
-        @JvmStatic fun nativeStop(handle: Long)
-        @JvmStatic fun nativeUpdatePipeline(
+    companion object {
+        init {
+            System.loadLibrary("radiosuite-native")
+        }
+
+        // ---- Declaraciones nativas (jni_bridge.cpp) ----
+        @JvmStatic private external fun nativeCreate(): Long
+        @JvmStatic private external fun nativeDestroy(handle: Long)
+        @JvmStatic private external fun nativeStart(handle: Long): Boolean
+        @JvmStatic private external fun nativeStop(handle: Long)
+        @JvmStatic private external fun nativeSetSourceGain(handle: Long, sourceId: Int, gainDb: Float)
+        @JvmStatic private external fun nativePushInputPcm(handle: Long, samples: FloatArray, channels: Int, frames: Int)
+        @JvmStatic private external fun nativePushPlayerPcm(handle: Long, samples: FloatArray, channels: Int, frames: Int)
+        @JvmStatic private external fun nativeUpdatePipeline(
             handle: Long, targetDb: Float, maxGainDb: Float,
             agcAttack: Float, agcRelease: Float,
             outGainDb: Float, enabled: Boolean
         )
-        @JvmStatic fun nativeInputPeakDb(handle: Long): Float
-        @JvmStatic fun nativeOutputPeakDb(handle: Long): Float
-        @JvmStatic fun nativeOutputRmsDb(handle: Long): Float
-        @JvmStatic fun nativeAgcGainDb(handle: Long): Float
-        @JvmStatic fun nativeBrickwallGrDb(handle: Long): Float
-    }
-
-    init {
-        System.loadLibrary("radiosuite-native")
+        @JvmStatic private external fun nativeInputPeakDb(handle: Long): Float
+        @JvmStatic private external fun nativeOutputPeakDb(handle: Long): Float
+        @JvmStatic private external fun nativeOutputRmsDb(handle: Long): Float
+        @JvmStatic private external fun nativeAgcGainDb(handle: Long): Float
+        @JvmStatic private external fun nativeBrickwallGrDb(handle: Long): Float
     }
 }

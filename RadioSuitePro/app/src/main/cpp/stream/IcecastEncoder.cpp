@@ -6,10 +6,10 @@
 #include <chrono>
 
 // Cabeceras de los códecs (en build real se enlazan como static libs).
-#include <opus/opus.h>
+#include <opus.h>
 #include <vorbis/vorbisenc.h>
 #include <ogg/ogg.h>
-#include <lame/lame.h>
+#include <lame.h>
 
 #define LOG_TAG "IcecastEncoder"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -43,7 +43,7 @@ bool IcecastEncoder::initEncoder() {
                 LOGE("opus_encoder_create falló: %d", err);
                 return false;
             }
-            opus_encoder_set_bitrate(enc, params_.bitrate * 1000);
+            opus_encoder_ctl(enc, OPUS_SET_BITRATE(params_.bitrate * 1000));
             encoderHandle_ = enc;
             LOGI("Encoder Opus: %dkbps, %dch, %dHz",
                  params_.bitrate, params_.channels, params_.sampleRate);
@@ -101,13 +101,16 @@ bool IcecastEncoder::start(PacketCallback cb) {
     packetCallback_ = cb;
     if (!initEncoder()) return false;
     running_.store(true);
-    // Lanza el bucle de codificación en un hilo propio.
-    std::thread([this]() { runEncodeLoop(); }).detach();
+    encodeThread_ = std::thread([this]() { runEncodeLoop(); });
     return true;
 }
 
 void IcecastEncoder::stop() {
     running_.store(false);
+    if (encodeThread_.joinable() && encodeThread_.get_id() != std::this_thread::get_id()) {
+        encodeThread_.join();
+    }
+    destroyEncoder();
 }
 
 void IcecastEncoder::pushSamples(const float* left, const float* right, std::size_t n) {
@@ -179,7 +182,6 @@ void IcecastEncoder::runEncodeLoop() {
             packetCallback_(encOut.data(), static_cast<std::size_t>(encoded));
         }
     }
-    destroyEncoder();
     LOGI("Bucle de codificación finalizado");
 }
 

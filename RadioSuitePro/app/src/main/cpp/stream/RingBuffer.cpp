@@ -3,14 +3,17 @@
 
 namespace radiosuite::audio {
 
-RingBuffer::RingBuffer(std::size_t capacitySamples)
-    : mask_(0) {
-    // Redondea a la siguiente potencia de 2 para usar & en vez de %.
-    std::size_t cap = 1;
-    while (cap < capacitySamples) cap <<= 1;
-    buffer_.resize(cap, 0.0f);
-    mask_ = cap - 1;
+namespace {
+std::size_t roundedCapacity(std::size_t requested) {
+    std::size_t capacity = 1;
+    while (capacity < requested) capacity <<= 1;
+    return capacity;
 }
+} // namespace
+
+RingBuffer::RingBuffer(std::size_t capacitySamples)
+    : buffer_(roundedCapacity(capacitySamples), 0.0f),
+      mask_(buffer_.size() - 1) {}
 
 std::size_t RingBuffer::available() const {
     const std::size_t w = writePos_.load(std::memory_order_acquire);

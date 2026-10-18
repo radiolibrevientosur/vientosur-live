@@ -23,6 +23,11 @@ void AudioMixer::setSource(std::size_t id, AudioSource* source, float gainDb) {
     slots_[id].active = (source != nullptr);
 }
 
+void AudioMixer::setSourceGain(std::size_t id, float gainDb) {
+    if (id >= kMaxSources) return;
+    slots_[id].gain.store(dbToGain(gainDb), std::memory_order_relaxed);
+}
+
 void AudioMixer::setSampleRate(float sr) {
     sampleRate_ = sr;
     crossfader_.setSampleRate(sr);

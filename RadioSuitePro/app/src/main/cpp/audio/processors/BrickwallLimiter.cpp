@@ -71,8 +71,8 @@ bool BrickwallLimiter::process(AudioBlock& block) {
 
         // Posición de lectura = writePos - lookahead (wrap).
         const std::size_t readPos = (writePos_ + delayL_.size() - lookaheadSamples_) % delayL_.size();
-        const float delayedL = delayL_[readPos_];
-        const float delayedR = (block.numChannels > 1) ? delayR_[readPos_] : delayedL;
+        const float delayedL = delayL_[readPos];
+        const float delayedR = (block.numChannels > 1) ? delayR_[readPos] : delayedL;
 
         // Determina ganancia objetivo para mantener debajo del ceiling.
         const float peakOut = std::max(std::fabs(delayedL), std::fabs(delayedR));

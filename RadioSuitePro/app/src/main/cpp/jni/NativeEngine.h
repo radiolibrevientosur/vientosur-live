@@ -9,6 +9,8 @@
 
 namespace radiosuite::jni {
 
+class PcmSource;
+
 // Posee la totalidad del motor nativo (mezclador + pipeline + render + encoder)
 // y expone handlers estables a Kotlin. Una sola instancia vive mientras el
 // Foreground Service esté activo.
@@ -29,6 +31,8 @@ public:
     // ---- Mezclador / fuentes ----
     void setSourceGain(std::size_t id, float gainDb);
     void startCrossfade(float durationMs);
+    void pushInputPcm(const float* samples, std::size_t frames, int channels);
+    void pushPlayerInputPcm(const float* samples, std::size_t frames, int channels);
 
     // ---- Streaming ----
     void setEncoderParams(const audio::EncoderParams& p);
@@ -42,7 +46,9 @@ private:
     std::unique_ptr<audio::AudioMixer>     mixer_;
     std::unique_ptr<audio::AudioPipeline>  pipeline_;
     std::unique_ptr<audio::OboeRenderer>   renderer_;
-    std::unique_ptr<audio::IcecastEncoder> encoder_;
+    std::unique_ptr<PcmSource> microphoneSource_;
+    std::unique_ptr<PcmSource> playerSource_;
+    std::shared_ptr<audio::IcecastEncoder> encoder_;
 };
 
 } // namespace radiosuite::jni

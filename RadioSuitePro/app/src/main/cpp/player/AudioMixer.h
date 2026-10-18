@@ -29,6 +29,7 @@ public:
 
     // Registra una fuente con un id estable y ganancia inicial.
     void setSource(std::size_t id, AudioSource* source, float gainDb);
+    void setSourceGain(std::size_t id, float gainDb);
 
     // Mezcla todas las fuentes activas en `block`. Bloque in-place.
     void mix(AudioBlock& block);

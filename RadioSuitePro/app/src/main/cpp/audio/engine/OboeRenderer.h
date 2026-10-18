@@ -1,8 +1,9 @@
 #pragma once
 
 #include <oboe/Oboe.h>
-#include "../audio/AudioPipeline.h"
-#include "../player/AudioMixer.h"
+#include "audio/AudioPipeline.h"
+#include "player/AudioMixer.h"
+#include <functional>
 #include <memory>
 #include <atomic>
 
@@ -15,7 +16,10 @@ namespace radiosuite::audio {
 // producidos por el mezclador, escribiendo el resultado al dispositivo.
 class OboeRenderer : public oboe::AudioStreamCallback {
 public:
-    OboeRenderer(AudioMixer* mixer, AudioPipeline* pipeline);
+    OboeRenderer(
+        AudioMixer* mixer,
+        AudioPipeline* pipeline,
+        std::function<void(const float*, const float*, std::size_t)> outputCallback);
     ~OboeRenderer();
 
     bool start();
@@ -32,6 +36,7 @@ public:
 private:
     AudioMixer*  mixer_;
     AudioPipeline* pipeline_;
+    std::function<void(const float*, const float*, std::size_t)> outputCallback_;
     std::shared_ptr<oboe::AudioStream> stream_;
     std::atomic<bool> running_{false};
 

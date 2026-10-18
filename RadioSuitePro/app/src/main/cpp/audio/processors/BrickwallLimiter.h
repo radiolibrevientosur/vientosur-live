@@ -3,6 +3,7 @@
 #include "../AudioProcessor.h"
 #include "../dsp/GainSmoothing.h"
 #include <atomic>
+#include <vector>
 
 namespace radiosuite::audio {
 

@@ -3,6 +3,7 @@
 #include <android/log.h>
 #include <cmath>
 #include <algorithm>
+#include <utility>
 
 #define LOG_TAG "OboeRenderer"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -10,29 +11,40 @@
 
 namespace radiosuite::audio {
 
-OboeRenderer::OboeRenderer(AudioMixer* mixer, AudioPipeline* pipeline)
-    : mixer_(mixer), pipeline_(pipeline) {}
+OboeRenderer::OboeRenderer(
+    AudioMixer* mixer,
+    AudioPipeline* pipeline,
+    std::function<void(const float*, const float*, std::size_t)> outputCallback)
+    : mixer_(mixer), pipeline_(pipeline), outputCallback_(std::move(outputCallback)) {}
 
 OboeRenderer::~OboeRenderer() { stop(); }
 
 bool OboeRenderer::start() {
     if (running_.load()) return true;
 
-    oboe::AudioStreamBuilder builder;
-    builder.setDirection(oboe::Direction::Output)
-           .setPerformanceMode(oboe::PerformanceMode::LowLatency)
-           .setSharingMode(oboe::SharingMode::Exclusive)
-           .setFormat(oboe::AudioFormat::Float)
-           .setChannelCount(oboe::ChannelCount::Stereo)
-           .setSampleRate(48000)
-           .setDataCallback(this)
-           .setErrorCallback(this)
-           .setUsage(oboe::Usage::Media)
-           .setContentType(oboe::ContentType::Music);
+    const auto openStream = [this](oboe::SharingMode sharingMode) {
+        oboe::AudioStreamBuilder builder;
+        builder.setDirection(oboe::Direction::Output)
+            ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
+            ->setSharingMode(sharingMode)
+            ->setFormat(oboe::AudioFormat::Float)
+            ->setChannelCount(oboe::ChannelCount::Stereo)
+            ->setSampleRate(48000)
+            ->setDataCallback(this)
+            ->setErrorCallback(this)
+            ->setUsage(oboe::Usage::Media)
+            ->setContentType(oboe::ContentType::Music);
+        return builder.openStream(stream_);
+    };
 
-    auto result = builder.openStream(stream_);
+    auto result = openStream(oboe::SharingMode::Exclusive);
     if (result != oboe::Result::OK) {
-        LOGE("No se pudo abrir el stream Oboe: %s", oboe::convertToText(result));
+        LOGI("Exclusive no disponible (%s); reintentando Shared", oboe::convertToText(result));
+        stream_.reset();
+        result = openStream(oboe::SharingMode::Shared);
+    }
+    if (result != oboe::Result::OK) {
+        LOGE("No se pudo abrir el stream Oboe en modo Shared: %s", oboe::convertToText(result));
         stream_.reset();
         return false;
     }
@@ -44,6 +56,7 @@ bool OboeRenderer::start() {
     result = stream_->requestStart();
     if (result != oboe::Result::OK) {
         LOGE("No se pudo iniciar el stream: %s", oboe::convertToText(result));
+        stream_->close();
         stream_.reset();
         return false;
     }
@@ -78,6 +91,7 @@ oboe::DataCallbackResult OboeRenderer::onAudioReady(
 
     // 2) El pipeline DSP procesa el bloque in-place.
     if (pipeline_) pipeline_->processBlock(mixed);
+    if (outputCallback_) outputCallback_(scratchL_.data(), scratchR_.data(), n);
 
     // 3) Interleave estéreo float al buffer de Oboe (deinterleaved -> interleaved
     //    si el stream lo exige; Oboe Float Stereo suele ser interleaved).
